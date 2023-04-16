@@ -1,13 +1,5 @@
-# Source files
-# ============
-*.Rdata binary
-*.RData binary
-*.rda   binary
-*.rdb   binary
-*.rds   binary
-*.Rd    text
-*.Rdx   binary
-*.Rmd	  text
-*.R  	  text
-*.Rproj text
-*.[Rr]md   linguist-detectable
+# Linguist overrides
+*.md linguist-detectable=true
+README.md linguist-detectable=false
+readme.md linguist-detectable=false
+
