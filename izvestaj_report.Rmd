@@ -1,0 +1,236 @@
+---
+title: "Izveštaj o servisiranoj opremi u zdravstvenim ustanovama u Republici Srbiji"
+author: "Institut za javno zdravlje Srbije „dr Milan Jovanović Batut”"
+date: "`r Sys.Date()`"
+output:
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r include=FALSE}
+library(here)
+library(rio)
+library(janitor)
+library(tidyverse)
+library(tidyr)
+library(scales)
+library(knitr)
+library(DT)
+library(dplyr)
+library(ggtext)
+options(scipen=999)
+
+options(DT.options = list(language = list(search = 'Pretraži:', sInfo = "Prikaži _START_ to _END_ od _TOTAL_ zapisa", sLengthMenu="Prikaži _MENU_ zapisa", paginate = list(previous = 'Prethodna', `next` = 'Sledeća'))))
+
+baza_opreme <- import(here ("data", "podaci_ulaz.xlsx"))
+baza_opreme <- clean_names(baza_opreme)
+baza_opreme <- baza_opreme |>
+  drop_na(ustanova)
+baza_opreme <- baza_opreme |> 
+  mutate(starost_opreme = 2023 - godina_proizvodnje)
+
+broj_ustanova <- n_distinct(baza_opreme$ustanova)
+
+broj_komada_opreme <- baza_opreme |> 
+  nrow()
+
+
+daN <- baza_opreme |> 
+  tabyl(ugovor_o_servisiranju_i_odrzavanju) |> 
+  filter(ugovor_o_servisiranju_i_odrzavanju== "Da") |> 
+  select(n)
+
+daPercent <- baza_opreme |> 
+  tabyl(ugovor_o_servisiranju_i_odrzavanju) |> 
+  filter(ugovor_o_servisiranju_i_odrzavanju== "Da") |> 
+  select(percent)*100
+
+suma_vrednosti_ugovora <- 
+  sum(baza_opreme$vrednost_ugovora_u_rsd, na.rm=T)
+format(suma_vrednosti_ugovora, big.mark = " ", decimal.mark = ",")
+
+cena_popravke <- 
+  sum(baza_opreme$cena_popravke_servisa_u_rsd, na.rm=T)
+
+# <div> sluzi za poravanje teksta
+```
+
+
+<div  style= "text-align: justify">
+
+Zaključno sa `r Sys.Date()`, ukupno `r broj_ustanova` zdravstvenih ustanova izvestilo je o `r broj_komada_opreme` komada opreme od nacionalnog značaja servisiranim tokom 2022. godine. Od tog broja je `r daN` (`r sprintf("%0.1f%%", daPercent)` svih servisiranih komada) imalo ugovo o servisiranju. U *tabeli 1.* prikazani su podaci o servisiranoj opremi prema vrsti zdravstvenoj ustanovi, a u *tabeli 2.* prema vrsti aparata. Obe tabele su interaktivne i omogućavaju pretragu i sortiranje prema kriterijumu.
+
+Prosečna starost servisirane opreme u godinama iznosila je `r round(mean(baza_opreme$starost_opreme, na.rm=T),1)`. Najstariji uređaj je imao `r round(max(baza_opreme$starost_opreme, na.rm=T),1)` godina.
+
+Servisirana opreme bila je `r format(sum(baza_opreme$broj_dana_van_funkcije, na.rm=T) , big.mark = " ")` dana van funkcije. Na *grafikonu 1.* prikazane su grupe opreme prema danim van funkcije, a na *grafikonu 2.* prikazane su podgrupama servisirane opreme prema danima van funkcije.
+
+Ukupna cena popravke iznosila je `r format(cena_popravke, big.mark = " ", decimal.mark = ",")` dinara. Na *grafikonu 3.* prikazane su cene popravke po grupama, a na *grafikonu 4.* prikazane su cene po podgrupama servisirane opreme.
+
+Ukupna vrednost ugovora o servisiranju je iznosila `r format(suma_vrednosti_ugovora, big.mark = " ", decimal.mark = ",")` dinara.
+
+</div>
+
+```{r echo=FALSE}
+# Tabela broj 1 po ustanovama
+
+summary_table_institution <- baza_opreme |> 
+  group_by("Naziv ustanove" = ustanova) |> 
+  summarise(
+    "Broj komada opreme" = n(),
+    "Pod ugovorom o servisiranju" = sum(ugovor_o_servisiranju_i_odrzavanju == "Da"),
+    "Broj dana van funkcije" = sum(broj_dana_van_funkcije, na.rm = T),
+    "Prosečna starost aparata" = round(sum(starost_opreme, na.rm = T)/n(),1),
+    "Ukupna cena popravke (hiljade RSD)" = sum(cena_popravke_servisa_u_rsd/1000, na.rm = T),
+    "Ukupna vrednost ugovora o servisiranju (hiljade RSD)" = sum(vrednost_ugovora_u_rsd/1000, na.rm = T)
+  )
+
+
+datatable(summary_table_institution, 
+          caption = 'Tabela 1. Servisirana medicinske opreme prema zdravstvenoj ustanovi') |> 
+  formatRound(c('Ukupna cena popravke (hiljade RSD)',
+                "Ukupna vrednost ugovora o servisiranju (hiljade RSD)"), digits = 0)
+```
+
+```{r echo=FALSE}
+# Tabela broj 2 po opremi
+
+summary_table_equipment <- baza_opreme |> 
+  group_by("Naziv opreme" = naziv_sifra_opreme) |> 
+  summarise(
+    "Broj komada opreme" = n(),
+    "Pod ugovorom o servisiranju" = sum(ugovor_o_servisiranju_i_odrzavanju == "Da"),
+    "Broj dana van funkcije" = sum(broj_dana_van_funkcije, na.rm = T),
+    "Prosečna starost aparata" = round(sum(starost_opreme, na.rm = T)/n(),1),
+    "Ukupna cena popravke (hiljade RSD)" = sum(cena_popravke_servisa_u_rsd/1000, na.rm = T),
+    "Ukupna vrednost ugovora o servisiranju (hiljade RSD)" = sum(vrednost_ugovora_u_rsd/1000, na.rm = T)
+  )
+
+
+datatable(summary_table_equipment, 
+          caption = 'Tabela 2. Servisirana medicinske opreme prema nazivu opreme') |> 
+  formatRound(c('Ukupna cena popravke (hiljade RSD)',
+                "Ukupna vrednost ugovora o servisiranju (hiljade RSD)"), digits = 0)
+```
+<br><br>
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+
+# grafikon 1 dani van funkcije po grupama
+
+nomenklatura_opreme <- import (here ("data", "nomenklatura_opreme.xlsx"))
+nomenklatura_opreme <- nomenklatura_opreme |> 
+  rename("naziv_sifra_opreme" = "naziv")
+
+baza_opreme_spojeno <- merge(baza_opreme,
+                             nomenklatura_opreme,
+                             by = "naziv_sifra_opreme")
+# grupisanje opreme po kategrorijama grupe 1
+
+grupisano <- baza_opreme_spojeno |> 
+  group_by(grupa1) |> 
+  summarise(
+    dani_van_funkcije = sum(broj_dana_van_funkcije, na.rm = T)
+  )
+# bar plot za predstavljanje dana van funkcije po kategorijama grupe 1
+ggplot(grupisano, 
+       aes(fct_reorder(grupa1,dani_van_funkcije), 
+           dani_van_funkcije))+
+geom_col()+
+coord_flip()+
+theme_classic()+
+xlab("Grupa medicinske opreme") +
+ylab("Ukupna dana van fukcije")+
+ggtitle("Grafikon 1. Broj dana van funkcije po grupama medicnske opreme")+
+scale_x_discrete(labels = label_wrap(30))+
+geom_text(aes(label=dani_van_funkcije, digits=0), hjust=1.5, color="white", size=3.5)
+
+# grafikon 2 dani van funkcije po podgrupama
+
+# grupisanje opreme po kategorijama grupe 2
+
+grupisano <- baza_opreme_spojeno |> 
+  group_by(grupa2) |> 
+  summarise(
+    dani_van_funkcije = sum(broj_dana_van_funkcije, na.rm = T)
+  ) |> 
+  filter(dani_van_funkcije > 1000)
+
+# bar plot za predstavljanje dana van funkcije po kategorijama grupe 2
+ggplot(grupisano, 
+       aes(fct_reorder(grupa2,dani_van_funkcije), 
+           dani_van_funkcije))+
+geom_col()+
+coord_flip()+
+theme_classic()+
+xlab("Podgrupa medicinske opreme") +
+ylab("Ukupna dana van funkcije")+
+ggtitle("\n\nGrafikon 2. Broj dana van funkcije po podgrupama medicnske opreme", subtitle = "Prikazane podgrupe sa više od 1000 dana van funkcije")+
+scale_x_discrete(labels = label_wrap(30))+
+geom_text(aes(label=dani_van_funkcije, digits=0), hjust=1.5, color="white", size=3.5)
+```
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+
+# grafikon 3 cene po grupama
+
+nomenklatura_opreme <- import (here ("data", "nomenklatura_opreme.xlsx"))
+nomenklatura_opreme <- nomenklatura_opreme |> 
+  rename("naziv_sifra_opreme" = "naziv")
+
+baza_opreme_spojeno <- merge(baza_opreme,
+                             nomenklatura_opreme,
+                             by = "naziv_sifra_opreme")
+# grupisanje opreme po kategrorijama grupe 1
+
+grupisano <- baza_opreme_spojeno |> 
+  group_by(grupa1) |> 
+  summarise(
+    cena = sum(cena_popravke_servisa_u_rsd, na.rm = T)
+  )
+# bar plot za predstavljanje cena popravke po kategorijama grupe 1
+ggplot(grupisano, 
+       aes(fct_reorder(grupa1,cena), 
+           cena/1000000))+
+geom_col()+
+coord_flip()+
+theme_classic()+
+xlab("Grupa medicinske opreme") +
+ylab("Ukupna cena popravke (u milionima RSD)")+
+ggtitle("\n\nGrafikon 3. Cena popravke po grupama medicnske opreme")+
+scale_x_discrete(labels = label_wrap(30))+
+geom_text(aes(label=round(cena/1000000), digits=0), hjust=1.5, color="white", size=3.5)
+
+# grafikon 4 cene po podgrupama
+
+# grupisanje opreme po kategrorijama grupe 2
+
+grupisano <- baza_opreme_spojeno |> 
+  group_by(grupa2) |> 
+  summarise(
+    cena = sum(cena_popravke_servisa_u_rsd, na.rm = T)
+  ) |> 
+  filter(cena > 5000000)
+# bar plot za predstavljanje cena popravke po kategorijama grupe 2
+ggplot(grupisano, 
+       aes(fct_reorder(grupa2,cena), 
+           cena/1000000))+
+geom_col()+
+coord_flip()+
+theme_classic()+
+xlab("Podgrupa medicinske opreme") +
+ylab("Ukupna cena popravke (u milionima RSD)")+
+ggtitle("\n\nGrafikon 4. Cena popravke po podgrupama medicnske opreme", subtitle = "Prikazane podgrupe sa cenom popravke većom od pet miliona RSD")+
+scale_x_discrete(labels = label_wrap(30))+
+geom_text(aes(label=round(cena/1000000), digits=0), hjust=1.5, color="white", size=3.5)
+```
+</br>
+</br>
+</br>
+</br>
+    <footer>
+        <p>Autori: Aleksandar Medarević, Vedran Martinović, Ivan Ivanović</p>
+        <p>Izvor: Servis javnog zdravlja</p>
+    </footer>
